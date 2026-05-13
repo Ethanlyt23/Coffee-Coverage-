@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nedcoffee — Roaster Coverage Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fff;--bg2:#f7f8fa;--bg3:#eef0f4;--txt:#1a1f2e;--txt2:#5a6272;--txt3:#9aa0ad;--border:#dde1e9;--border2:#c8cdd8;--green:#1d9e75;--gbg:rgba(29,158,117,0.12);--gtxt:#0c6e52;--amber:#ba7517;--abg:rgba(186,117,23,0.12);--atxt:#7a4d0e;--red:#c0392b;--rbg:rgba(192,57,43,0.1);--rtxt:#8b2820;--blue:#185fa5;--blue-bg:#e6f1fb;--rad:8px;--rad-lg:12px;--shadow:0 1px 3px rgba(0,0,0,0.08)}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg2);color:var(--txt);font-size:13px;min-height:100vh}
+.header{background:var(--txt);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100;gap:12px}
+.logo{font-size:15px;font-weight:600;color:#fff;letter-spacing:.02em;white-space:nowrap}.logo span{color:var(--green);font-weight:400}
+.header-mid{display:flex;align-items:center;gap:10px;flex:1;justify-content:center}
+.period-tag{font-size:11px;color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);padding:3px 10px;border-radius:20px;white-space:nowrap}
+.live-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.6);white-space:nowrap}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#888;transition:background .3s}
+.live-dot.connected{background:var(--green);box-shadow:0 0 6px var(--green)}
+.live-dot.saving{background:#f0a500}
+.header-right{display:flex;gap:7px;flex-shrink:0}
+.hbtn{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:6px 13px;border-radius:var(--rad);border:1px solid rgba(255,255,255,.2);cursor:pointer;background:rgba(255,255,255,.08);color:#fff;font-family:inherit;transition:background .15s;white-space:nowrap}
+.hbtn:hover{background:rgba(255,255,255,.18)}.hbtn.primary{background:var(--green);border-color:var(--green)}.hbtn.primary:hover{background:#17896a}
+.page{padding:18px 24px;max-width:1700px;margin:0 auto}
+.setup-banner{background:#fff3cd;border:1px solid #ffc107;border-radius:var(--rad-lg);padding:20px 24px;margin-bottom:20px}
+.setup-banner h2{font-size:15px;font-weight:600;color:#7a4d0e;margin-bottom:10px}
+.setup-banner ol{font-size:13px;color:#5a3a00;line-height:2;padding-left:20px}
+.setup-banner code{background:rgba(0,0,0,0.1);padding:1px 6px;border-radius:4px;font-family:monospace;font-size:12px}
+.setup-banner a{color:#185fa5}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:18px}
+.mc{background:var(--bg);border:1px solid var(--border);border-radius:var(--rad-lg);padding:14px 16px;box-shadow:var(--shadow)}
+.mc-label{font-size:11px;color:var(--txt2);margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.mc-value{font-size:22px;font-weight:600;color:var(--txt);line-height:1}.mc-sub{font-size:11px;color:var(--txt3);margin-top:3px}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.seg{display:flex;border:1px solid var(--border);border-radius:var(--rad);overflow:hidden}
+.seg button{font-size:12px;padding:6px 12px;border:none;background:var(--bg);color:var(--txt2);cursor:pointer;font-family:inherit;border-right:1px solid var(--border)}
+.seg button:last-child{border-right:none}.seg button.on{background:var(--txt);color:#fff;font-weight:500}.seg button:hover:not(.on){background:var(--bg2)}
+select,input.flt{font-size:12px;padding:6px 10px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg);color:var(--txt);font-family:inherit}
+input.flt{width:180px}input.flt::placeholder{color:var(--txt3)}
+.notice{background:var(--blue-bg);border:1px solid #b5d4f4;border-radius:var(--rad);padding:10px 14px;margin-bottom:16px;font-size:12px;color:#0c447c;line-height:1.6}
+.tbl-wrap{background:var(--bg);border:1px solid var(--border);border-radius:var(--rad-lg);overflow:auto;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:900px}
+thead{position:sticky;top:0;z-index:10}
+th{background:var(--bg3);padding:8px 5px;text-align:center;font-weight:600;font-size:11px;color:var(--txt2);border-bottom:1px solid var(--border2);white-space:nowrap}
+th.tl{text-align:left;padding-left:14px}
+td{padding:5px 4px;border-bottom:1px solid var(--border);vertical-align:middle;text-align:center}
+td.tl{text-align:left;padding-left:14px}tr:last-child td{border-bottom:none}
+tr.trader-hdr td{background:#f0f2f6;font-size:11px;font-weight:700;color:var(--txt2);padding:6px 14px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--border2)}
+tr.avg-row td{background:#f7f9fc;font-weight:600;font-size:11px;border-top:1px solid var(--border2)}
+tr.spacer td{height:6px;background:var(--bg2);border-bottom:1px solid var(--border2)}
+.rname{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:155px;display:block}.rcountry{font-size:10px;color:var(--txt3)}
+.blend-pill{display:inline-flex;font-size:10px;border-radius:6px;overflow:hidden;border:1px solid var(--border)}
+.ba{background:#fef3dc;color:#7a4d0e;padding:2px 5px;font-weight:600}.br{background:#e3f7ef;color:#0c6e52;padding:2px 5px;font-weight:600}
+.b100a{background:#fef3dc;color:#7a4d0e;padding:2px 7px;font-weight:600;border-radius:6px;border:1px solid var(--border);font-size:10px;display:inline-block}
+.b100r{background:#e3f7ef;color:#0c6e52;padding:2px 7px;font-weight:600;border-radius:6px;border:1px solid var(--border);font-size:10px;display:inline-block}
+.cov-inp{width:46px;font-size:13px;font-weight:700;text-align:center;padding:4px 2px;border-radius:6px;border:1px solid var(--border);background:transparent;color:#1a1f2e !important;font-family:inherit;-moz-appearance:textfield;transition:border-color .1s}
+.cov-inp::-webkit-inner-spin-button,.cov-inp::-webkit-outer-spin-button{-webkit-appearance:none}.cov-inp:focus{outline:none;border-color:var(--blue)}
+.qf-wrap{display:flex;align-items:center;gap:3px;justify-content:center}
+.qf-sel{font-size:10px;padding:2px 3px;border-radius:4px;border:0.5px solid var(--border2);background:var(--bg);color:var(--txt);font-family:inherit;cursor:pointer;max-width:36px}
+.qf-go{font-size:10px;padding:2px 5px;border-radius:4px;border:0.5px solid var(--green);background:var(--bg);color:var(--green);cursor:pointer;font-family:inherit;font-weight:600}
+.qf-go:hover{background:var(--green);color:#fff}
+.month-now{background:rgba(24,95,165,0.04)}th.month-now-hdr{color:var(--blue)!important}
+.panel{background:var(--bg);border:1px solid var(--border);border-radius:var(--rad-lg);padding:20px;margin-top:18px;box-shadow:var(--shadow)}
+.panel h2{font-size:14px;font-weight:600;margin-bottom:4px}.panel p{font-size:12px;color:var(--txt2);margin-bottom:14px}
+.ag{display:grid;grid-template-columns:2fr 75px 130px 120px 130px 34px;gap:6px;align-items:center;margin-bottom:5px}
+.ag.hdr{font-size:11px;font-weight:600;color:var(--txt2);padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.ag input,.ag select{font-size:12px;padding:5px 8px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg);color:var(--txt);font-family:inherit;width:100%}
+.del-btn{background:none;border:none;font-size:18px;color:var(--txt3);cursor:pointer;padding:0;line-height:1;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--rad)}.del-btn:hover{background:var(--rbg);color:var(--rtxt)}
+.btn-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:7px 14px;border-radius:var(--rad);border:1px solid var(--border);cursor:pointer;background:var(--bg);color:var(--txt);font-family:inherit}.btn:hover{background:var(--bg2)}
+.btn.primary{background:var(--green);border-color:var(--green);color:#fff}.btn.primary:hover{background:#17896a}
+.btn.danger{background:var(--rbg);border-color:transparent;color:var(--rtxt)}
+.hist-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--border);border-radius:var(--rad);margin-bottom:6px}.hist-item:hover{background:var(--bg2)}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">Nedcoffee <span>Coverage</span></div>
+  <div class="header-mid">
+    <div class="period-tag" id="periodTag">Loading...</div>
+    <div class="live-badge"><div class="live-dot" id="liveDot"></div><span id="liveLabel">Connecting...</span></div>
+  </div>
+  <div class="header-right">
+    <button class="hbtn" onclick="togglePanel('admin')">&#9881; Roasters</button>
+    <button class="hbtn" onclick="togglePanel('history')">&#128196; History</button>
+    <button class="hbtn" onclick="exportExcel()">&#8595; Excel</button>
+    <button class="hbtn" onclick="reseedData()" title="Restore original FY2026 data">&#8635; Restore data</button>
+    <button class="hbtn primary" onclick="doRollForward()">&#8594; Roll forward</button>
+  </div>
+</header>
+
+<div class="page">
+<div class="notice">
+  <strong>Coverage scale: 1–10</strong> &nbsp;·&nbsp; 10 = fully covered &nbsp;·&nbsp;
+  <span style="color:var(--gtxt);font-weight:600">&#9632; 7–10</span> good &nbsp;
+  <span style="color:var(--atxt);font-weight:600">&#9632; 4–6.9</span> moderate &nbsp;
+  <span style="color:var(--rtxt);font-weight:600">&#9632; 0–3.9</span> low &nbsp;·&nbsp;
+  Bags split automatically by blend % × annual demand.
+</div>
+<div class="metrics" id="metrics"></div>
+<div class="controls">
+  <div class="seg">
+    <button id="bAll" class="on" onclick="setView('all')">All</button>
+    <button id="bRob" onclick="setView('rob')">Robusta</button>
+    <button id="bAra" onclick="setView('ara')">Arabica</button>
+    <button id="bMix" onclick="setView('mix')">Mixed</button>
+  </div>
+  <select id="traderFilter" onchange="doRender()"><option value="">All traders</option></select>
+  <input class="flt" id="searchBox" placeholder="Search roaster..." oninput="doRender()">
+</div>
+<div class="tw"><table><thead id="tHead"></thead><tbody id="tBody"></tbody></table></div>
+<div class="panel" id="adminPanel" style="display:none">
+  <h2>Roaster master</h2>
+  <p>Edit roasters, blend ratios and annual demand. Click Save to sync to all users.</p>
+  <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px">
+    <label style="font-size:12px;color:var(--txt2);font-weight:500">Filter by trader:</label>
+    <select id="adminTraderFilter" onchange="renderAdmin()" style="font-size:12px;padding:5px 10px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg);color:var(--txt)">
+      <option value="">All traders</option>
+    </select>
+    <span id="adminCount" style="font-size:12px;color:var(--txt2)"></span>
+  </div>
+  <div class="ag hdr"><span>Name</span><span>Country</span><span>Annual bags</span><span>% Arabica</span><span>Trader</span><span></span></div>
+  <div id="adminRows"></div>
+  <div class="btn-row">
+    <button class="btn" onclick="addRoasterRow()">+ Add roaster</button>
+    <button class="btn primary" onclick="saveRoasters()">&#10003; Save &amp; sync</button>
+  </div>
+</div>
+<div class="panel" id="historyPanel" style="display:none">
+  <h2>Archived months</h2>
+  <p>Download any archived month as Excel.</p>
+  <div id="historyList"></div>
+  <div class="btn-row"><button class="btn danger" onclick="clearHistory()">Clear all history</button></div>
+</div>
+</div>
+
+<script>
+// ── Firebase config ──────────────────────────────────────────────────────────
+var firebaseConfig = {
+  apiKey:            "AIzaSyAWaU8iQkR6Q6avugQamC-1IIZLsSpYV7A",
+  authDomain:        "sucden-coffee-coverage.firebaseapp.com",
+  databaseURL:       "https://sucden-coffee-coverage-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "sucden-coffee-coverage",
+  storageBucket:     "sucden-coffee-coverage.firebasestorage.app",
+  messagingSenderId: "237675379815",
+  appId:             "1:237675379815:web:445e380ce6b9f0ad55a8c2"
+};
+
+// ── Static data ───────────────────────────────────────────────────────────────
+var TRADERS = ['Alberto','Andre','Chris','CoffeeAM','Daniel','Dennis','Harish','Lucas','Michel','Richard','Wayne'];
+const DEFAULT_ROASTERS=[{id:'r1',name:'El Marino',country:'MX',trader:'Alberto',annual:6100,arabica:20},{id:'r2',name:'Induban',country:'DR',trader:'Alberto',annual:9500,arabica:30},{id:'r3',name:'5 Hispanos',country:'AR',trader:'Alberto',annual:700,arabica:0},{id:'r4',name:'Bonafide',country:'AR',trader:'Alberto',annual:1900,arabica:0},{id:'r5',name:'Gesol',country:'MX',trader:'Alberto',annual:6638,arabica:15},{id:'r6',name:'Solubles Instantaneos',country:'EC',trader:'Alberto',annual:6660,arabica:10},{id:'r100',name:'Rentokil',country:'EC',trader:'Alberto',annual:250,arabica:0},{id:'r7',name:'Tresmontes',country:'EC',trader:'Alberto',annual:2500,arabica:0},{id:'r101',name:'Cafetal',country:'CL',trader:'Alberto',annual:450,arabica:0},{id:'r8',name:'La Virginia',country:'AR',trader:'Alberto',annual:2250,arabica:0},{id:'r9',name:'Cabrales',country:'AR',trader:'Alberto',annual:2500,arabica:0},{id:'r10',name:'Molinos',country:'AR',trader:'Alberto',annual:2500,arabica:0},{id:'r11',name:'Cafesca',country:'MX',trader:'Alberto',annual:6225,arabica:15},{id:'r12',name:'El Cafe',country:'EC',trader:'Alberto',annual:16375,arabica:20},{id:'r102',name:'Cafecom',country:'EC',trader:'Alberto',annual:250,arabica:10},{id:'r103',name:'Askelgado',country:'EC',trader:'Alberto',annual:5625,arabica:15},{id:'r13',name:'Kapal Api Group',country:'ID',trader:'Andre',annual:22200,arabica:10},{id:'r14',name:'Mayora Group',country:'ID',trader:'Andre',annual:14300,arabica:10},{id:'r15',name:'Wings Group',country:'ID',trader:'Andre',annual:8000,arabica:10},{id:'r16',name:'Sari Incofood',country:'ID',trader:'Andre',annual:4500,arabica:0},{id:'r104',name:'Savoria Group',country:'ID',trader:'Andre',annual:2250,arabica:0},{id:'r105',name:'Aneka Kopi',country:'ID',trader:'Andre',annual:1500,arabica:0},{id:'r106',name:'Java Prima',country:'ID',trader:'Andre',annual:750,arabica:0},{id:'r17',name:'Super Food',country:'PH',trader:'Chris',annual:450000,arabica:50},{id:'r18',name:'URC',country:'PH',trader:'Chris',annual:500000,arabica:50},{id:'r19',name:'Dan Kaffee',country:'KR',trader:'Chris',annual:100000,arabica:50},{id:'r107',name:'BP Commerce',country:'KR',trader:'Chris',annual:25000,arabica:50},{id:'r20',name:'CK',country:'KR',trader:'Chris',annual:41666,arabica:50},{id:'r21',name:'Coffee Nara',country:'KR',trader:'Chris',annual:60000,arabica:50},{id:'r22',name:'Ottogi',country:'KR',trader:'Chris',annual:83333,arabica:50},{id:'r108',name:'Daesang',country:'KR',trader:'Chris',annual:50000,arabica:50},{id:'r109',name:'Mitsui',country:'JP',trader:'Chris',annual:250000,arabica:50},{id:'r110',name:'Marubeni',country:'JP',trader:'Chris',annual:100000,arabica:50},{id:'r23',name:'Tim Hortons',country:'US',trader:'CoffeeAM',annual:1500000,arabica:100},{id:'r24',name:'MZB',country:'US',trader:'CoffeeAM',annual:1200000,arabica:90},{id:'r25',name:'Reily',country:'US',trader:'CoffeeAM',annual:500000,arabica:90},{id:'r26',name:'Motherparker',country:'US',trader:'CoffeeAM',annual:1200000,arabica:90},{id:'r27',name:'S&D / Westrock',country:'US',trader:'CoffeeAM',annual:1000000,arabica:90},{id:'r28',name:'Kraft',country:'US',trader:'CoffeeAM',annual:750000,arabica:50},{id:'r29',name:'Cafiver',country:'VN',trader:'Daniel',annual:475000,arabica:50},{id:'r30',name:'Catoex',country:'VN',trader:'Daniel',annual:170000,arabica:10},{id:'r31',name:'Cafinco',country:'VN',trader:'Daniel',annual:170000,arabica:20},{id:'r32',name:'Nestle Mex.',country:'MX',trader:'Daniel',annual:2000000,arabica:80},{id:'r33',name:'Descamex',country:'MX',trader:'Daniel',annual:400000,arabica:90},{id:'r34',name:'Sabormex',country:'MX',trader:'Daniel',annual:280000,arabica:100},{id:'r35',name:'Cafenio',country:'MX',trader:'Daniel',annual:120000,arabica:100},{id:'r36',name:'Fichaux',country:'FR',trader:'Dennis',annual:300000,arabica:20},{id:'r37',name:'Malongo',country:'FR',trader:'Dennis',annual:70000,arabica:2},{id:'r38',name:'Rombouts',country:'BE',trader:'Dennis',annual:240000,arabica:20},{id:'r39',name:'Conaagral',country:'FR',trader:'Dennis',annual:170000,arabica:5},{id:'r40',name:'CCL',country:'IN',trader:'Harish',annual:7222222,arabica:90},{id:'r41',name:'Hindustan',country:'IN',trader:'Harish',annual:1388889,arabica:50},{id:'r42',name:'Narasus',country:'IN',trader:'Harish',annual:1847222,arabica:50},{id:'r43',name:'Tata',country:'IN',trader:'Harish',annual:2833333,arabica:20},{id:'r111',name:'Vayan',country:'IN',trader:'Harish',annual:694444,arabica:0},{id:'r112',name:'Vintage',country:'IN',trader:'Harish',annual:694444,arabica:0},{id:'r113',name:'SLN (Harish)',country:'IN',trader:'Harish',annual:1527778,arabica:40},{id:'r44',name:'Paulig',country:'FI',trader:'Lucas',annual:0,arabica:95},{id:'r45',name:'Strauss',country:'IL',trader:'Lucas',annual:0,arabica:85},{id:'r114',name:'Aldi',country:'DE',trader:'Lucas',annual:0,arabica:70},{id:'r115',name:'Nestle',country:'CH',trader:'Lucas',annual:0,arabica:80},{id:'r116',name:'Starbucks',country:'US',trader:'Lucas',annual:0,arabica:100},{id:'r47',name:'UCC / United',country:'JP',trader:'Lucas',annual:27614,arabica:60},{id:'r46',name:'JDE peets',country:'NL',trader:'Lucas',annual:0,arabica:65},{id:'r48',name:'Massimo Zanetti',country:'IT',trader:'Lucas',annual:0,arabica:60},{id:'r117',name:'CMP',country:'NL',trader:'Lucas',annual:0,arabica:30},{id:'r118',name:'Ahold Delhaize',country:'NL',trader:'Michel',annual:53333,arabica:40},{id:'r119',name:'Anadolu Pars Gida',country:'TR',trader:'Michel',annual:5417,arabica:35},{id:'r120',name:'Anamarija Company',country:'BA',trader:'Michel',annual:56667,arabica:15},{id:'r121',name:'Arasco Food BV',country:'NL',trader:'Michel',annual:6667,arabica:40},{id:'r50',name:'Atlantic Droga Kolinska',country:'SI',trader:'Michel',annual:200000,arabica:40},{id:'r122',name:'AYMAN DOO',country:'BA',trader:'Michel',annual:4167,arabica:50},{id:'r123',name:'Birlik Baharat',country:'TR',trader:'Michel',annual:10000,arabica:40},{id:'r52',name:'CenterSnab',country:'RU',trader:'Michel',annual:150000,arabica:40},{id:'r124',name:'Coffeeton',country:'RU',trader:'Michel',annual:97500,arabica:35},{id:'r51',name:'Franck JSC',country:'HR',trader:'Michel',annual:125000,arabica:50},{id:'r125',name:'Indian Ecotrade SL',country:'ES',trader:'Michel',annual:8333,arabica:30},{id:'r49',name:'Instanta',country:'PL',trader:'Michel',annual:583333,arabica:30},{id:'r126',name:'Iraklis Roupas',country:'GR',trader:'Michel',annual:15000,arabica:30},{id:'r127',name:'J. Wolff & Co.',country:'NL',trader:'Michel',annual:25000,arabica:50},{id:'r128',name:'JADRO D.O.O.',country:'HR',trader:'Michel',annual:4167,arabica:40},{id:'r129',name:'MARCAFFE D.O.O.',country:'MK',trader:'Michel',annual:15000,arabica:40},{id:'r130',name:'SDS',country:'RU',trader:'Michel',annual:100000,arabica:30},{id:'r131',name:'STUDEN DMCC',country:'AE',trader:'Michel',annual:33333,arabica:40},{id:'r132',name:'Tchibo GmbH',country:'DE',trader:'Richard',annual:300000,arabica:30},{id:'r53',name:'JDE Robusta',country:'NL',trader:'Richard',annual:2200000,arabica:40},{id:'r133',name:'Coffy Handels',country:'DE',trader:'Richard',annual:255000,arabica:30},{id:'r134',name:'Tunisia',country:'TN',trader:'Richard',annual:192500,arabica:30},{id:'r54',name:'DEK HBG/BER',country:'DE',trader:'Richard',annual:270000,arabica:40},{id:'r135',name:'Westhoff',country:'DE',trader:'Richard',annual:80000,arabica:40},{id:'r56',name:'Coffein',country:'DE',trader:'Richard',annual:262500,arabica:35},{id:'r136',name:'Melitta Germany',country:'DE',trader:'Richard',annual:120000,arabica:40},{id:'r137',name:'DallMayr',country:'DE',trader:'Richard',annual:63000,arabica:50},{id:'r138',name:'Darboven',country:'DE',trader:'Richard',annual:125000,arabica:50},{id:'r55',name:'Pelican Rouge',country:'NL',trader:'Richard',annual:200000,arabica:40},{id:'r139',name:'Misr Cafe',country:'EG',trader:'Wayne',annual:0,arabica:100},{id:'r57',name:'CCL (Wayne)',country:'IN',trader:'Wayne',annual:2500000,arabica:88},{id:'r140',name:'Narasus (Wayne)',country:'IN',trader:'Wayne',annual:0,arabica:100},{id:'r58',name:'SLN (Wayne)',country:'IN',trader:'Wayne',annual:1487700,arabica:50},{id:'r141',name:'Vayhan',country:'IN',trader:'Wayne',annual:0,arabica:0},{id:'r63',name:'Meinl',country:'AT',trader:'Wayne',annual:625000,arabica:100},{id:'r142',name:'Morrocco',country:'MA',trader:'Wayne',annual:0,arabica:50},{id:'r62',name:'Lavazza',country:'IT',trader:'Wayne',annual:1200000,arabica:85},{id:'r143',name:'Seda',country:'ES',trader:'Wayne',annual:0,arabica:80},{id:'r144',name:'Gimoka',country:'IT',trader:'Wayne',annual:0,arabica:60},{id:'r145',name:'Prosol',country:'IT',trader:'Wayne',annual:0,arabica:50},{id:'r146',name:'ElCafe',country:'ES',trader:'Wayne',annual:0,arabica:70},{id:'r147',name:'El Marino (W)',country:'MX',trader:'Wayne',annual:0,arabica:20},{id:'r148',name:'Moak',country:'IT',trader:'Wayne',annual:0,arabica:50},{id:'r149',name:'Carraro',country:'IT',trader:'Wayne',annual:0,arabica:70},{id:'r150',name:'Kimbo',country:'IT',trader:'Wayne',annual:0,arabica:60},{id:'r151',name:'Saquella',country:'IT',trader:'Wayne',annual:0,arabica:70},{id:'r152',name:'Pergamino',country:'CO',trader:'Wayne',annual:0,arabica:100},{id:'r59',name:'Tata (Wayne)',country:'IN',trader:'Wayne',annual:1480000,arabica:85},{id:'r60',name:'Hindustan (W)',country:'IN',trader:'Wayne',annual:665000,arabica:90},{id:'r61',name:'Indus',country:'IN',trader:'Wayne',annual:627000,arabica:90}
+,{id:'r200',name:'Nestrade S.A.',country:'CH',trader:'Lucas',annual:0,arabica:80},
+  {id:'r201',name:'JDE B.V. (Parent)',country:'NL',trader:'Richard',annual:0,arabica:50},
+  {id:'r202',name:'SPA TAFADIS',country:'DZ',trader:'Wayne',annual:5200000,arabica:20},
+  {id:'r203',name:'Compania de Elaborados de Cafe',country:'CO',trader:'Daniel',annual:3079450,arabica:70},
+  {id:'r204',name:'Gruppo Gimoka Spa',country:'IT',trader:'Wayne',annual:2400773,arabica:50},
+  {id:'r205',name:'RGC Coffee Inc.',country:'US',trader:'CoffeeAM',annual:2046390,arabica:85},
+  {id:'r206',name:'ALEA FOOD',country:'AE',trader:'Wayne',annual:1661460,arabica:30},
+  {id:'r207',name:'Alkaff Srl',country:'IT',trader:'Wayne',annual:1163784,arabica:60},
+  {id:'r208',name:'Rajab Hanieh & Sons',country:'JO',trader:'Wayne',annual:1006102,arabica:30},
+  {id:'r209',name:'Bijdendijk',country:'NL',trader:'Richard',annual:1059530,arabica:40},
+  {id:'r210',name:'Edel S.A.',country:'CO',trader:'Daniel',annual:826400,arabica:60},
+  {id:'r211',name:'APRIN Dis Ticaret',country:'TR',trader:'Michel',annual:826310,arabica:40},
+  {id:'r212',name:'Bless Bean Co., Ltd',country:'KR',trader:'Chris',annual:769800,arabica:70},
+  {id:'r213',name:'Caffe Pascucci',country:'IT',trader:'Wayne',annual:682500,arabica:70},
+  {id:'r214',name:'NGON Coffee Company',country:'VN',trader:'Daniel',annual:657000,arabica:20},
+  {id:'r215',name:'Sodecaf',country:'SN',trader:'Dennis',annual:673800,arabica:30},
+  {id:'r216',name:'Les Cafes Dubois S.A.',country:'FR',trader:'Dennis',annual:616200,arabica:40},
+  {id:'r217',name:'Segafredo Zanetti S.p.A.',country:'IT',trader:'Wayne',annual:585760,arabica:60},
+  {id:'r218',name:'UCC Coffee Services Switzerland',country:'CH',trader:'Lucas',annual:563300,arabica:60},
+  {id:'r219',name:'Cafes Sahara',country:'TN',trader:'Wayne',annual:558600,arabica:20},
+  {id:'r220',name:'Benssycafe',country:'MA',trader:'Wayne',annual:546480,arabica:20},
+  {id:'r221',name:'Iniciativas Comerciales Navarr',country:'ES',trader:'Dennis',annual:526310,arabica:50},
+  {id:'r222',name:'Studen Middle East FZCO',country:'AE',trader:'Wayne',annual:481694,arabica:40},
+  {id:'r223',name:'N.V. Coffeeteam S.A.',country:'BE',trader:'Dennis',annual:474600,arabica:40},
+  {id:'r224',name:'Carrion',country:'EC',trader:'Alberto',annual:443400,arabica:20},
+  {id:'r225',name:'Ekaf S.p.A.',country:'IT',trader:'Wayne',annual:434300,arabica:50},
+  {id:'r226',name:'Daniel Gida Ithalat',country:'TR',trader:'Michel',annual:403200,arabica:40},
+  {id:'r227',name:'Caffe Borbone SRL',country:'IT',trader:'Wayne',annual:400000,arabica:30},
+  {id:'r228',name:'Caffe Verde Europe SRL',country:'IT',trader:'Wayne',annual:394820,arabica:50},
+  {id:'r229',name:'General de Solubles S.A.',country:'ES',trader:'Alberto',annual:358580,arabica:20},
+  {id:'r230',name:'Univers Production',country:'FR',trader:'Dennis',annual:354720,arabica:40},
+  {id:'r231',name:'Diemme Spa',country:'IT',trader:'Wayne',annual:345600,arabica:70},
+  {id:'r232',name:'RNC Korea Co., Ltd',country:'KR',trader:'Chris',annual:327500,arabica:60},
+  {id:'r233',name:'Monte Carmelo SRL',country:'DO',trader:'Alberto',annual:325781,arabica:30},
+  {id:'r234',name:'Nutis SRL',country:'IT',trader:'Wayne',annual:318720,arabica:40},
+  {id:'r235',name:'OCIBRENI',country:'CI',trader:'Dennis',annual:314520,arabica:10},
+  {id:'r236',name:'Woosung M.F Co., Ltd',country:'KR',trader:'Chris',annual:307300,arabica:60},
+  {id:'r237',name:'H.A. Bennett & Sons',country:'AU',trader:'Lucas',annual:304360,arabica:70},
+  {id:'r238',name:'Melitta Europa GmbH',country:'DE',trader:'Richard',annual:302800,arabica:40},
+  {id:'r239',name:'Habycaf',country:'MA',trader:'Wayne',annual:288000,arabica:20},
+  {id:'r240',name:'Lucaffe Srl S.B.',country:'IT',trader:'Wayne',annual:280800,arabica:70},
+  {id:'r241',name:'Comercial de Materias Primas',country:'ES',trader:'Alberto',annual:260000,arabica:40},
+  {id:'r242',name:'Gricaf Srl',country:'IT',trader:'Wayne',annual:235680,arabica:40},
+  {id:'r243',name:'FEIO Srl',country:'IT',trader:'Wayne',annual:213780,arabica:50},
+  {id:'r244',name:'Caffitaly System S.P.A',country:'IT',trader:'Wayne',annual:211440,arabica:60},
+  {id:'r245',name:'Beyers Koffie NV',country:'BE',trader:'Dennis',annual:190800,arabica:40},
+  {id:'r246',name:'Mecafe',country:'MA',trader:'Wayne',annual:175200,arabica:20},
+  {id:'r247',name:'Amigos Caffe',country:'IT',trader:'Wayne',annual:172800,arabica:60},
+  {id:'r248',name:'COVIM SPA',country:'IT',trader:'Wayne',annual:171600,arabica:50},
+  {id:'r249',name:'Aziende Riunite Caffe S.R.L.',country:'IT',trader:'Wayne',annual:169810,arabica:50},
+  {id:'r250',name:'NB Corporation',country:'KR',trader:'Chris',annual:153800,arabica:60},
+  {id:'r251',name:'Coffee Tree SRL',country:'IT',trader:'Wayne',annual:144550,arabica:50},
+  {id:'r252',name:'Caffe Sun SRL',country:'IT',trader:'Wayne',annual:140120,arabica:40},];
+const SEED={"r1|2026-01":"10","r1|2026-02":"10","r1|2026-03":"10","r1|2026-04":"10","r1|2026-05":"10","r1|2026-06":"10","r1|2026-07":"10","r1|2026-08":"10","r1|2026-09":"5","r1|2026-10":"1","r1|2026-11":"1","r1|2026-12":"0.5","r2|2026-01":"10","r2|2026-02":"10","r2|2026-03":"10","r2|2026-04":"10","r2|2026-05":"10","r2|2026-06":"10","r2|2026-07":"10","r2|2026-08":"10","r2|2026-09":"5","r2|2026-10":"1","r2|2026-11":"1","r2|2026-12":"0.5","r3|2026-01":"10","r3|2026-02":"10","r3|2026-03":"10","r3|2026-04":"10","r3|2026-05":"10","r3|2026-06":"10","r3|2026-07":"10","r3|2026-08":"10","r3|2026-09":"5","r3|2026-10":"1","r3|2026-11":"1","r3|2026-12":"0.5","r4|2026-01":"10","r4|2026-02":"10","r4|2026-03":"10","r4|2026-04":"10","r4|2026-05":"10","r4|2026-06":"10","r4|2026-07":"10","r4|2026-08":"10","r4|2026-09":"5","r4|2026-10":"1","r4|2026-11":"1","r4|2026-12":"0.5","r5|2026-01":"10","r5|2026-02":"10","r5|2026-03":"10","r5|2026-04":"10","r5|2026-05":"10","r5|2026-06":"10","r5|2026-07":"10","r5|2026-08":"10","r5|2026-09":"5","r5|2026-10":"1","r5|2026-11":"1","r5|2026-12":"0.5","r6|2026-01":"10","r6|2026-02":"10","r6|2026-03":"10","r6|2026-04":"10","r6|2026-05":"10","r6|2026-06":"10","r6|2026-07":"10","r6|2026-08":"10","r6|2026-09":"5","r6|2026-10":"1","r6|2026-11":"1","r6|2026-12":"0.5","r100|2026-01":"10","r100|2026-02":"10","r100|2026-03":"10","r100|2026-04":"10","r100|2026-05":"10","r100|2026-06":"10","r100|2026-07":"10","r100|2026-08":"10","r100|2026-09":"5","r100|2026-10":"1","r100|2026-11":"1","r100|2026-12":"0.5","r7|2026-01":"10","r7|2026-02":"10","r7|2026-03":"10","r7|2026-04":"10","r7|2026-05":"10","r7|2026-06":"10","r7|2026-07":"10","r7|2026-08":"10","r7|2026-09":"5","r7|2026-10":"1","r7|2026-11":"1","r7|2026-12":"0.5","r101|2026-01":"10","r101|2026-02":"10","r101|2026-03":"10","r101|2026-04":"10","r101|2026-05":"10","r101|2026-06":"10","r101|2026-07":"10","r101|2026-08":"10","r101|2026-09":"5","r101|2026-10":"1","r101|2026-11":"1","r101|2026-12":"0.5","r8|2026-01":"10","r8|2026-02":"10","r8|2026-03":"10","r8|2026-04":"10","r8|2026-05":"10","r8|2026-06":"10","r8|2026-07":"10","r8|2026-08":"10","r8|2026-09":"5","r8|2026-10":"1","r8|2026-11":"1","r8|2026-12":"0.5","r9|2026-01":"10","r9|2026-02":"10","r9|2026-03":"10","r9|2026-04":"10","r9|2026-05":"10","r9|2026-06":"10","r9|2026-07":"10","r9|2026-08":"10","r9|2026-09":"5","r9|2026-10":"1","r9|2026-11":"1","r9|2026-12":"0.5","r10|2026-01":"10","r10|2026-02":"10","r10|2026-03":"10","r10|2026-04":"10","r10|2026-05":"10","r10|2026-06":"10","r10|2026-07":"10","r10|2026-08":"10","r10|2026-09":"5","r10|2026-10":"1","r10|2026-11":"1","r10|2026-12":"0.5","r11|2026-01":"10","r11|2026-02":"10","r11|2026-03":"10","r11|2026-04":"10","r11|2026-05":"10","r11|2026-06":"10","r11|2026-07":"10","r11|2026-08":"10","r11|2026-09":"5","r11|2026-10":"1","r11|2026-11":"1","r11|2026-12":"0.5","r12|2026-01":"10","r12|2026-02":"10","r12|2026-03":"10","r12|2026-04":"10","r12|2026-05":"10","r12|2026-06":"10","r12|2026-07":"10","r12|2026-08":"10","r12|2026-09":"5","r12|2026-10":"1","r12|2026-11":"1","r12|2026-12":"0.5","r102|2026-01":"10","r102|2026-02":"10","r102|2026-03":"10","r102|2026-04":"10","r102|2026-05":"10","r102|2026-06":"10","r102|2026-07":"10","r102|2026-08":"10","r102|2026-09":"5","r102|2026-10":"1","r102|2026-11":"1","r102|2026-12":"0.5","r103|2026-01":"10","r103|2026-02":"10","r103|2026-03":"10","r103|2026-04":"10","r103|2026-05":"10","r103|2026-06":"10","r103|2026-07":"10","r103|2026-08":"10","r103|2026-09":"5","r103|2026-10":"1","r103|2026-11":"1","r103|2026-12":"0.5","r13|2026-01":"10","r13|2026-02":"10","r13|2026-03":"10","r13|2026-04":"10","r13|2026-05":"10","r13|2026-06":"10","r13|2026-07":"8","r13|2026-08":"8","r13|2026-09":"7","r13|2026-10":"5","r13|2026-11":"6","r13|2026-12":"8","r14|2026-01":"10","r14|2026-02":"10","r14|2026-03":"10","r14|2026-04":"10","r14|2026-05":"10","r14|2026-06":"10","r14|2026-07":"7","r14|2026-08":"6","r14|2026-09":"0","r14|2026-10":"0","r14|2026-11":"0","r14|2026-12":"0","r15|2026-01":"10","r15|2026-02":"10","r15|2026-03":"10","r15|2026-04":"8","r15|2026-05":"7","r16|2026-01":"10","r16|2026-02":"10","r16|2026-03":"9","r16|2026-04":"8","r104|2026-01":"10","r104|2026-02":"9","r104|2026-03":"8","r105|2026-01":"9","r105|2026-02":"8","r106|2026-01":"8","r106|2026-02":"7","r17|2026-01":"10","r17|2026-02":"10","r17|2026-03":"10","r17|2026-04":"10","r17|2026-05":"10","r19|2026-01":"10","r19|2026-02":"10","r19|2026-03":"7","r19|2026-04":"7","r107|2026-01":"7","r107|2026-02":"2","r20|2026-01":"10","r20|2026-02":"10","r20|2026-03":"8","r20|2026-04":"5","r20|2026-05":"2","r20|2026-06":"2","r20|2026-07":"2","r20|2026-08":"2","r20|2026-09":"2","r20|2026-10":"2","r21|2026-01":"9","r21|2026-02":"5","r21|2026-03":"3","r22|2026-01":"10","r108|2026-01":"5","r109|2026-01":"3","r110|2026-01":"2","r23|2026-01":"10","r23|2026-02":"10","r23|2026-03":"10","r23|2026-04":"10","r23|2026-05":"10","r23|2026-06":"10","r23|2026-07":"5","r23|2026-08":"5","r23|2026-09":"2","r23|2026-10":"2","r23|2026-11":"2","r24|2026-01":"10","r24|2026-02":"10","r24|2026-03":"10","r24|2026-04":"10","r24|2026-05":"10","r24|2026-06":"8","r25|2026-01":"10","r25|2026-02":"10","r25|2026-03":"10","r25|2026-04":"10","r25|2026-05":"10","r25|2026-06":"2.5","r25|2026-07":"2.5","r25|2026-08":"2.5","r25|2026-09":"2.5","r25|2026-10":"2.5","r25|2026-11":"2.5","r25|2026-12":"2.5","r26|2026-01":"10","r26|2026-02":"10","r26|2026-03":"10","r26|2026-04":"3.3","r26|2026-05":"3.3","r26|2026-06":"3.3","r27|2026-01":"10","r27|2026-02":"10","r27|2026-03":"10","r27|2026-04":"5","r27|2026-05":"5","r27|2026-06":"2","r27|2026-07":"0.5","r27|2026-08":"0.5","r29|2026-01":"10","r29|2026-02":"10","r29|2026-03":"9","r29|2026-04":"8","r29|2026-05":"8","r29|2026-06":"5","r29|2026-07":"5","r29|2026-08":"5","r29|2026-09":"5","r30|2026-01":"10","r30|2026-02":"10","r30|2026-03":"10","r30|2026-04":"10","r30|2026-05":"10","r30|2026-06":"10","r30|2026-07":"8","r30|2026-08":"8","r30|2026-09":"8","r30|2026-10":"3","r30|2026-11":"3","r31|2026-01":"10","r31|2026-02":"10","r31|2026-03":"9","r31|2026-04":"8","r31|2026-05":"7","r31|2026-06":"7","r31|2026-07":"7","r31|2026-08":"7","r32|2026-01":"10","r32|2026-02":"10","r32|2026-03":"10","r32|2026-04":"10","r32|2026-05":"10","r32|2026-06":"10","r32|2026-07":"10","r32|2026-08":"6","r32|2026-09":"6","r32|2026-10":"6","r33|2026-01":"10","r33|2026-02":"10","r33|2026-03":"10","r33|2026-04":"10","r33|2026-05":"10","r33|2026-06":"10","r33|2026-07":"10","r33|2026-08":"8","r33|2026-09":"7","r33|2026-10":"6","r33|2026-11":"4","r33|2026-12":"2","r34|2026-01":"10","r34|2026-02":"10","r34|2026-03":"10","r34|2026-04":"10","r34|2026-05":"10","r34|2026-06":"10","r34|2026-07":"10","r34|2026-08":"10","r34|2026-09":"10","r34|2026-10":"10","r34|2026-11":"10","r34|2026-12":"10","r35|2026-01":"10","r35|2026-02":"10","r35|2026-03":"10","r35|2026-04":"10","r35|2026-05":"10","r35|2026-06":"10","r35|2026-07":"10","r35|2026-08":"8","r35|2026-09":"8","r35|2026-10":"8","r35|2026-11":"7","r35|2026-12":"7","r36|2026-01":"10","r36|2026-02":"10","r36|2026-03":"10","r36|2026-04":"7.5","r36|2026-05":"5","r37|2026-01":"10","r37|2026-02":"10","r37|2026-03":"10","r37|2026-04":"10","r37|2026-05":"10","r37|2026-06":"7.5","r38|2026-01":"10","r38|2026-02":"10","r38|2026-03":"10","r38|2026-04":"7.5","r38|2026-05":"7.5","r39|2026-01":"10","r39|2026-02":"10","r40|2026-01":"10","r40|2026-02":"10","r40|2026-03":"10","r40|2026-04":"9","r40|2026-05":"7","r40|2026-06":"5","r40|2026-07":"4","r40|2026-08":"3","r40|2026-09":"1","r40|2026-10":"0.5","r40|2026-11":"0.5","r41|2026-01":"10","r41|2026-02":"10","r41|2026-03":"10","r41|2026-04":"7","r41|2026-05":"6","r41|2026-06":"3","r41|2026-07":"1","r41|2026-08":"0.5","r42|2026-01":"10","r42|2026-02":"10","r42|2026-03":"10","r42|2026-04":"8","r42|2026-05":"7","r42|2026-06":"4","r42|2026-07":"3","r43|2026-01":"10","r43|2026-02":"10","r43|2026-03":"10","r43|2026-04":"8","r43|2026-05":"6","r43|2026-06":"3","r43|2026-07":"2","r111|2026-01":"10","r111|2026-02":"10","r111|2026-03":"10","r111|2026-04":"9","r111|2026-05":"7","r111|2026-06":"2","r111|2026-07":"1","r112|2026-01":"10","r112|2026-02":"10","r112|2026-03":"10","r112|2026-04":"8","r112|2026-05":"7","r112|2026-06":"2","r112|2026-07":"1","r113|2026-01":"10","r113|2026-02":"10","r113|2026-03":"10","r113|2026-04":"7","r113|2026-05":"7","r113|2026-06":"2","r113|2026-07":"1","r113|2026-10":"3","r44|2026-01":"10","r44|2026-02":"10","r44|2026-03":"10","r44|2026-04":"10","r44|2026-05":"10","r44|2026-06":"10","r44|2026-07":"10","r44|2026-08":"10","r44|2026-09":"10","r44|2026-10":"10","r44|2026-11":"10","r44|2026-12":"10","r45|2026-01":"10","r45|2026-02":"10","r45|2026-03":"10","r45|2026-04":"10","r45|2026-05":"10","r45|2026-06":"10","r45|2026-07":"10","r45|2026-08":"10","r45|2026-09":"10","r45|2026-10":"10","r45|2026-11":"10","r45|2026-12":"10","r114|2026-01":"10","r114|2026-02":"10","r114|2026-03":"10","r114|2026-04":"10","r114|2026-05":"10","r114|2026-06":"10","r114|2026-07":"10","r114|2026-08":"10","r114|2026-09":"10","r114|2026-10":"10","r114|2026-11":"10","r114|2026-12":"10","r115|2026-01":"10","r115|2026-02":"10","r115|2026-03":"10","r115|2026-04":"10","r115|2026-05":"10","r115|2026-06":"10","r115|2026-07":"10","r115|2026-08":"10","r115|2026-09":"10","r115|2026-10":"10","r115|2026-11":"10","r115|2026-12":"10","r116|2026-01":"10","r116|2026-02":"10","r116|2026-03":"10","r116|2026-04":"10","r116|2026-05":"10","r116|2026-06":"10","r116|2026-07":"10","r116|2026-08":"10","r116|2026-09":"10","r116|2026-10":"10","r116|2026-11":"10","r116|2026-12":"10","r47|2026-01":"10","r47|2026-02":"10","r47|2026-03":"10","r47|2026-04":"10","r47|2026-05":"10","r47|2026-06":"10","r47|2026-07":"10","r47|2026-08":"10","r47|2026-09":"10","r47|2026-10":"10","r47|2026-11":"10","r47|2026-12":"10","r46|2026-01":"10","r46|2026-02":"10","r46|2026-03":"10","r46|2026-04":"10","r46|2026-05":"10","r46|2026-06":"10","r46|2026-07":"10","r46|2026-08":"10","r46|2026-09":"10","r46|2026-10":"10","r46|2026-11":"10","r46|2026-12":"10","r117|2026-01":"10","r117|2026-02":"10","r117|2026-03":"10","r117|2026-04":"10","r117|2026-05":"10","r117|2026-06":"9","r117|2026-07":"9","r117|2026-08":"9","r117|2026-09":"9","r117|2026-10":"9","r117|2026-11":"9","r117|2026-12":"9","r118|2026-01":"10","r118|2026-02":"10","r118|2026-03":"10","r118|2026-04":"10","r118|2026-05":"8","r118|2026-06":"5","r118|2026-07":"3","r119|2026-01":"10","r119|2026-02":"10","r119|2026-03":"10","r119|2026-04":"6","r119|2026-05":"4","r120|2026-01":"10","r120|2026-02":"10","r120|2026-03":"10","r120|2026-04":"8","r120|2026-05":"6","r120|2026-06":"4","r121|2026-01":"10","r121|2026-02":"10","r121|2026-03":"8","r121|2026-04":"6","r121|2026-05":"2","r50|2026-01":"10","r50|2026-02":"10","r50|2026-03":"10","r50|2026-04":"10","r50|2026-05":"6","r50|2026-06":"6","r50|2026-07":"6","r50|2026-08":"6","r50|2026-09":"2","r50|2026-10":"2","r122|2026-01":"10","r122|2026-02":"10","r122|2026-03":"5","r123|2026-01":"10","r123|2026-02":"10","r123|2026-03":"10","r123|2026-04":"5","r52|2026-01":"10","r52|2026-02":"10","r52|2026-03":"10","r52|2026-04":"10","r52|2026-05":"6","r52|2026-06":"4","r52|2026-07":"2","r124|2026-01":"10","r124|2026-02":"10","r124|2026-03":"8","r124|2026-04":"4","r124|2026-05":"2","r51|2026-01":"10","r51|2026-02":"10","r51|2026-03":"10","r51|2026-04":"10","r51|2026-05":"10","r51|2026-06":"10","r51|2026-07":"8","r51|2026-08":"8","r51|2026-09":"4","r51|2026-10":"4","r125|2026-01":"10","r125|2026-02":"10","r125|2026-03":"2","r49|2026-01":"10","r49|2026-02":"10","r49|2026-03":"10","r49|2026-04":"8","r49|2026-05":"8","r49|2026-06":"6","r49|2026-07":"6","r49|2026-08":"4","r49|2026-09":"4","r126|2026-01":"10","r126|2026-02":"10","r126|2026-03":"8","r126|2026-04":"8","r126|2026-05":"2","r126|2026-06":"2","r127|2026-01":"10","r127|2026-02":"10","r127|2026-03":"10","r128|2026-01":"10","r128|2026-02":"10","r128|2026-03":"8","r128|2026-04":"8","r129|2026-01":"10","r129|2026-02":"10","r129|2026-03":"6","r129|2026-04":"4","r129|2026-05":"2","r130|2026-01":"10","r130|2026-02":"10","r130|2026-03":"10","r130|2026-04":"8","r130|2026-05":"6","r130|2026-06":"4","r130|2026-07":"2","r131|2026-01":"10","r131|2026-02":"10","r131|2026-03":"8","r131|2026-04":"6","r131|2026-05":"2","r53|2026-01":"10","r53|2026-02":"10","r53|2026-03":"10","r53|2026-04":"5","r53|2026-05":"5","r53|2026-06":"1.5","r53|2026-07":"1.5","r54|2026-01":"10","r54|2026-02":"10","r54|2026-03":"10","r54|2026-04":"8","r54|2026-05":"8","r54|2026-06":"1.5","r54|2026-07":"1.5","r56|2026-01":"10","r56|2026-02":"10","r56|2026-03":"10","r56|2026-04":"5","r56|2026-05":"3","r56|2026-06":"1","r55|2026-01":"10","r55|2026-02":"10","r55|2026-03":"10","r55|2026-04":"10","r55|2026-05":"10","r55|2026-06":"6","r55|2026-07":"6","r55|2026-08":"2","r55|2026-09":"2","r63|2026-01":"10","r63|2026-02":"10","r63|2026-03":"10","r63|2026-04":"10","r63|2026-05":"10","r63|2026-06":"10","r63|2026-07":"10","r63|2026-08":"10","r63|2026-09":"10","r63|2026-10":"10","r63|2026-11":"10","r63|2026-12":"10","r142|2026-01":"10","r142|2026-02":"10","r142|2026-03":"10","r142|2026-04":"10","r59|2026-01":"10","r59|2026-02":"10","r59|2026-03":"10","r60|2026-01":"10","r60|2026-02":"10","r60|2026-03":"10","r60|2026-04":"10","r61|2026-01":"10","r61|2026-02":"10","r61|2026-03":"10","r61|2026-04":"10","r61|2026-05":"10","r61|2026-06":"10"};
+
+// ── STATE ─────────────────────────────────────────────────────
+var ST = { windowStart:'2026-01', data:{}, roasters:DEFAULT_ROASTERS, history:[] };
+var QF_MONTHS = {};
+var VIEW = 'all';
+var PENDING = null;
+var saveTimer = null;
+
+// ── HELPERS ───────────────────────────────────────────────────
+function getWS(){ var p=ST.windowStart.split('-'); return new Date(+p[0],+p[1]-1,1); }
+function getMonths(ws){ var a=[],d=new Date(ws.getFullYear(),ws.getMonth(),1); for(var i=0;i<12;i++){ a.push(new Date(d)); d.setMonth(d.getMonth()+1); } return a; }
+function monthKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function monthLabel(d){ return d.toLocaleString('default',{month:'short',year:'2-digit'}); }
+function getCov(rid,mk){ var v=ST.data[rid+'|'+mk]; return v!==undefined?v:''; }
+function fmtK(n){ if(!n||n===0)return'—'; if(n>=1e6)return(n/1e6).toFixed(1)+'M'; if(n>=1000)return Math.round(n/1000)+'k'; return String(n); }
+function covBg(v){ if(v===''||v===null||v===undefined)return'transparent'; var n=parseFloat(v); if(isNaN(n))return'transparent'; if(n>=7)return'rgba(29,158,117,0.13)'; if(n>=4)return'rgba(186,117,23,0.13)'; return'rgba(192,57,43,0.1)'; }
+function covFg(v){ if(v===''||v===null||v===undefined)return'var(--txt)'; var n=parseFloat(v); if(isNaN(n))return'var(--txt)'; if(n>=7)return'#0c6e52'; if(n>=4)return'#7a4d0e'; return'#8b2820'; }
+function rtype(r){ return r.arabica===100?'ara':r.arabica===0?'rob':'mix'; }
+function setLive(on){
+  var dot=document.getElementById('liveDot'), lbl=document.getElementById('liveLabel');
+  if(on){ dot.className='live-dot connected'; lbl.textContent='Live — changes shared instantly'; }
+  else{ dot.className='live-dot'; lbl.textContent='Offline'; }
+}
+function setSaving(){
+  document.getElementById('liveDot').className='live-dot saving';
+  document.getElementById('liveLabel').textContent='Saving...';
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(function(){setLive(true);},1200);
+}
+
+// ── RENDER ────────────────────────────────────────────────────
+function doRender(){
+  if(!Array.isArray(ST.roasters)) ST.roasters = Object.values(ST.roasters||{});
+  var ws=getWS(), months=getMonths(ws), now=new Date(), currMk=monthKey(now);
+  var tf=document.getElementById('traderFilter').value;
+  var search=document.getElementById('searchBox').value.toLowerCase();
+  document.getElementById('periodTag').textContent=monthLabel(months[0])+' – '+monthLabel(months[11]);
+
+  var roasters=ST.roasters.filter(function(r){
+    if(tf&&r.trader!==tf)return false;
+    if(VIEW==='rob'&&rtype(r)!=='rob')return false;
+    if(VIEW==='ara'&&rtype(r)!=='ara')return false;
+    if(VIEW==='mix'&&rtype(r)!=='mix')return false;
+    if(search&&r.name.toLowerCase().indexOf(search)<0&&r.trader.toLowerCase().indexOf(search)<0&&r.country.toLowerCase().indexOf(search)<0)return false;
+    return true;
+  });
+
+  // Header
+  var hdr='<tr><th class="tl" style="width:155px">Roaster</th><th style="width:34px">Ctry</th><th style="width:55px">Trader</th><th style="width:70px">Annual bags</th><th style="width:68px">Blend</th><th style="width:64px">Ara bags</th><th style="width:64px">Rob bags</th>'+'<th style="width:95px">Fill</th>';
+  months.forEach(function(m){ var mk=monthKey(m),cur=mk===currMk; hdr+='<th style="width:47px'+(cur?';color:var(--green)':'')+'">' +monthLabel(m)+'</th>'; });
+  hdr+='<th style="width:50px">Avg</th></tr>';
+  document.getElementById('tHead').innerHTML=hdr;
+
+  var byT={};
+  roasters.forEach(function(r){ if(!byT[r.trader])byT[r.trader]=[]; byT[r.trader].push(r); });
+  var order=TRADERS.filter(function(t){return byT[t];});
+  var html='';
+
+  order.forEach(function(trader){
+    var rows=byT[trader];
+    html+='<tr class="trader-hdr"><td colspan="'+(7+months.length+1)+'">'+trader+' · '+rows.length+' roaster'+(rows.length!==1?'s':'')+'</td></tr>';
+    rows.forEach(function(r){
+      var ara=Math.round((r.annual||0)*r.arabica/100);
+      var rob=Math.round((r.annual||0)*(100-r.arabica)/100);
+      var vals=[]; months.forEach(function(m){ var v=getCov(r.id,monthKey(m)); if(v!=='')vals.push(parseFloat(v)); });
+      var avg=vals.length?(vals.reduce(function(a,b){return a+b;})/vals.length).toFixed(1):null;
+      var tp=rtype(r);
+      var bp=tp==='ara'?'<span class="b100a">100% Ara</span>':tp==='rob'?'<span class="b100r">100% Rob</span>':'<span class="blend-pill"><span class="ba">'+r.arabica+'%A</span><span class="br">'+(100-r.arabica)+'%R</span></span>';
+      html+='<tr><td class="tl"><span class="rname" title="'+r.name+'">'+r.name+'</span><span class="rcountry">'+r.country+'</span></td>';
+      html+='<td style="font-size:10px;color:var(--txt3)">'+r.country+'</td>';
+      html+='<td style="font-size:10px;color:var(--txt2)">'+r.trader+'</td>';
+      html+='<td style="font-size:11px;font-weight:600">'+fmtK(r.annual||0)+'</td>';
+      html+='<td>'+bp+'</td>';
+      html+='<td style="font-size:11px;font-weight:600">'+fmtK(ara)+'</td>';
+      html+='<td style="font-size:11px;font-weight:600">'+fmtK(rob)+'</td>';
+      var qfTd = document.createElement('td');
+      var qfDiv = document.createElement('div'); qfDiv.className='qf-wrap';
+      var mSel = document.createElement('select'); mSel.id='qfm-'+r.id; mSel.className='qf-sel';
+      var mDef=document.createElement('option'); mDef.value='0'; mDef.textContent='months'; mSel.appendChild(mDef);
+      for(var mi=1;mi<=12;mi++){var o=document.createElement('option');o.value=mi;o.textContent=mi+' mo';mSel.appendChild(o);}
+      mSel.value='0';
+      (function(rid){ mSel.addEventListener('change', function(){ QF_MONTHS[rid]=this.value; }); })(r.id);
+      var goBtn = document.createElement('button'); goBtn.className='qf-go'; goBtn.textContent='✓';
+      (function(rid){ goBtn.addEventListener('click', function(){ quickFill(rid); }); })(r.id);
+      qfDiv.appendChild(mSel); qfDiv.appendChild(goBtn);
+      qfTd.appendChild(qfDiv); html += qfTd.outerHTML;
+      
+      months.forEach(function(m){
+        var mk=monthKey(m),v=getCov(r.id,mk),cur=mk===currMk;
+        var inp=document.createElement('input');inp.className='cov-inp';inp.type='number';inp.min=0;inp.max=10;inp.step=0.5;inp.setAttribute('data-rid',r.id);inp.setAttribute('data-mk',mk);inp.setAttribute('value',v);inp.value=v;inp.style.background=covBg(v);inp.style.color='#1a1f2e';inp.onchange=function(){setCov(this.getAttribute('data-rid'),this.getAttribute('data-mk'),this.value);};inp.oninput=inp.onchange;var td=document.createElement('td');if(cur)td.className='month-now';td.appendChild(inp);html+=td.outerHTML;
+      });
+      html+='<td style="font-weight:700;font-size:12px;color:'+covFg(avg)+'">'+(avg!==null?avg:'—')+'</td></tr>';
+    });
+
+    var ma=months.map(function(m){
+      var mk=monthKey(m);
+      var vs=rows.map(function(r){var v=getCov(r.id,mk);return v!==''?parseFloat(v):null;}).filter(function(v){return v!==null;});
+      return vs.length?vs.reduce(function(a,b){return a+b;})/vs.length:null;
+    });
+    var aa=ma.filter(function(v){return v!==null;});
+    var ta=aa.length?(aa.reduce(function(a,b){return a+b;})/aa.length).toFixed(1):null;
+    html+='<tr class="avg-row"><td class="tl" colspan="7" style="color:var(--txt2)">∅ '+trader+' average</td>';
+    ma.forEach(function(a,i){
+      var cur=monthKey(months[i])===currMk;
+      html+='<td style="background:'+covBg(a)+';color:'+covFg(a)+';font-size:11px;text-align:center'+(cur?';outline:2px solid var(--blue);outline-offset:-2px':'')+'">'+(a!==null?a.toFixed(1):'—')+'</td>';
+    });
+    html+='<td style="color:'+covFg(ta)+';font-size:12px;font-weight:700;text-align:center">'+(ta!==null?ta:'—')+'</td></tr>';
+    html+='<tr class="spacer"><td colspan="'+(7+months.length+1)+'"></td></tr>';
+  });
+
+  if(!html) html='<tr><td colspan="'+(7+months.length+1)+'" style="text-align:center;padding:2rem;color:var(--txt3)">No roasters match current filter.</td></tr>';
+  document.getElementById('tBody').innerHTML=html;
+  updateMetrics();
+}
+
+// ── METRICS ───────────────────────────────────────────────────
+function updateMetrics(){
+  var ws=getWS(),months=getMonths(ws),allVals=[];
+  ST.roasters.forEach(function(r){ months.forEach(function(m){ var v=getCov(r.id,monthKey(m)); if(v!=='')allVals.push(parseFloat(v)); }); });
+  var oa=allVals.length?(allVals.reduce(function(a,b){return a+b;})/allVals.length).toFixed(1):'—';
+  var ta=ST.roasters.reduce(function(s,r){return s+(r.annual||0);},0);
+  var filled=Object.values(ST.data).filter(function(v){return v!==''&&v!==null;}).length;
+  document.getElementById('metrics').innerHTML=
+    '<div class="mc"><div class="mc-label">Overall avg</div><div class="mc-value">'+(oa==='—'?'—':oa+' /10')+'</div><div class="mc-sub">all roasters · all months</div></div>'+
+    '<div class="mc"><div class="mc-label">Total demand</div><div class="mc-value">'+fmtK(ta)+'</div><div class="mc-sub">bags per year</div></div>'+
+    '<div class="mc"><div class="mc-label">Cells filled</div><div class="mc-value">'+filled+'</div><div class="mc-sub">of '+(ST.roasters.length*12)+'</div></div>'+
+    '<div class="mc"><div class="mc-label">Window</div><div class="mc-value" style="font-size:16px">'+monthLabel(getWS())+'</div><div class="mc-sub">'+((ST.history||[]).length)+' archived</div></div>'+
+    '<div class="mc"><div class="mc-label">Roasters</div><div class="mc-value">'+ST.roasters.length+'</div><div class="mc-sub">'+TRADERS.length+' traders</div></div>';
+}
+
+// ── USER ACTIONS ──────────────────────────────────────────────
+function setCov(rid,mk,val){
+  var v=String(val).trim();
+  if(v!==''){ var n=parseFloat(v); if(isNaN(n)){v='';}else{n=Math.min(10,Math.max(0,n)); v=String(Math.round(n*10)/10);} }
+  ST.data[rid+'|'+mk]=v;
+  var inp=document.querySelector('[data-rid="'+rid+'"][data-mk="'+mk+'"]');
+  if(inp){ inp.value=v; inp.style.background=covBg(v); inp.style.color='#1a1f2e'; }
+  updateMetrics();
+  pushFB('data/'+rid+'__'+mk, v||null);
+}
+
+function setView(v){
+  VIEW=v;
+  ['All','Rob','Ara','Mix'].forEach(function(x){
+    document.getElementById('b'+x).classList.toggle('on',(v==='all'&&x==='All')||(v==='rob'&&x==='Rob')||(v==='ara'&&x==='Ara')||(v==='mix'&&x==='Mix'));
+  });
+  doRender();
+}
+
+function togglePanel(name){
+  var map={admin:'adminPanel',history:'historyPanel'};
+  Object.keys(map).forEach(function(k){
+    var el=document.getElementById(map[k]);
+    el.style.display=(k===name&&el.style.display==='none')?'block':'none';
+  });
+  if(name==='admin')renderAdmin();
+  if(name==='history')renderHistory();
+}
+
+function doRollForward(){
+  var ws=getWS(),months=getMonths(ws),archMk=monthKey(months[0]);
+  if(!confirm('Roll forward?\n\nArchives '+monthLabel(months[0])+' and moves window to '+monthLabel(months[1])+'.'))return;
+  var snap={month:archMk,label:monthLabel(months[0]),timestamp:new Date().toISOString(),data:{},roasters:JSON.parse(JSON.stringify(ST.roasters))};
+  months.forEach(function(m){ var mk=monthKey(m); ST.roasters.forEach(function(r){ var k=r.id+'|'+mk; if(ST.data[k]!==undefined&&ST.data[k]!=='')snap.data[k]=ST.data[k]; }); });
+  var history=(ST.history||[]).concat([snap]);
+  pushFB('windowStart',monthKey(new Date(ws.getFullYear(),ws.getMonth()+1,1)));
+  pushFB('history',history);
+  alert('Rolled forward. '+monthLabel(months[0])+' archived.');
+}
+
+function exportExcel(){
+  var ws=getWS(),months=getMonths(ws);
+  var wb=XLSX.utils.book_new();
+  var rows=[['Nedcoffee — Roaster Coverage Report'],['Period: '+monthLabel(months[0])+' – '+monthLabel(months[11])],['Exported: '+new Date().toLocaleDateString()],['Coverage scale: 0–10  (10 = fully covered)'],[]];
+  var hdrRow=['Roaster','Country','Trader','Annual Bags','% Arabica','Arabica Bags','Robusta Bags'];
+  months.forEach(function(m){hdrRow.push(monthLabel(m));});
+  hdrRow.push('12M Avg');
+  rows.push(hdrRow);
+  ST.roasters.forEach(function(r){
+    var ara=Math.round((r.annual||0)*r.arabica/100),rob=Math.round((r.annual||0)*(100-r.arabica)/100);
+    var vals=months.map(function(m){var v=ST.data[r.id+'|'+monthKey(m)];return(v!==undefined&&v!==''&&v!==null)?parseFloat(v):null;});
+    var filled=vals.filter(function(v){return v!==null;});
+    var avg=filled.length?Math.round(filled.reduce(function(a,b){return a+b;})/filled.length*10)/10:null;
+    var row=[r.name,r.country,r.trader,r.annual||0,r.arabica+'%',ara,rob];
+    vals.forEach(function(v){row.push(v!==null?v:'');});
+    row.push(avg!==null?avg:'');
+    rows.push(row);
+  });
+  var sheet=XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb,sheet,'Coverage '+monthLabel(ws));
+  XLSX.writeFile(wb,'Nedcoffee_Coverage_'+ST.windowStart+'.xlsx');
+}
+
+function renderHistory(){
+  var el=document.getElementById('historyList'),hist=ST.history||[];
+  if(!hist.length){el.innerHTML='<p style="color:var(--txt3);font-size:12px;padding:10px 0">No archived months yet.</p>';return;}
+  el.innerHTML=[].concat(hist).reverse().map(function(snap,ri){
+    var i=hist.length-1-ri,d=new Date(snap.timestamp),ds=d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+    return'<div class="hist-item"><div><div style="font-size:13px;font-weight:600">'+snap.label+'</div><div style="font-size:11px;color:var(--txt3);margin-top:2px">Archived '+ds+' · '+Object.keys(snap.data||{}).length+' entries</div></div><button class="btn" onclick="downloadArchive('+i+')">↓ Excel</button></div>';
+  }).join('');
+}
+
+function downloadArchive(idx){
+  var snap=(ST.history||[])[idx]; if(!snap)return;
+  var months=getMonths(new Date(snap.month.split('-')[0],parseInt(snap.month.split('-')[1])-1,1));
+  var wb=XLSX.utils.book_new();
+  var rows=[['Archive: '+snap.label],[]];
+  var hdrRow=['Roaster','Country','Trader'];
+  months.forEach(function(m){hdrRow.push(monthLabel(m));});
+  rows.push(hdrRow);
+  (snap.roasters||ST.roasters).forEach(function(r){
+    var row=[r.name,r.country,r.trader];
+    months.forEach(function(m){var v=snap.data[r.id+'|'+monthKey(m)];row.push(v||'');});
+    rows.push(row);
+  });
+  var sheet=XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb,sheet,'Archive '+snap.label);
+  XLSX.writeFile(wb,'Nedcoffee_Archive_'+snap.month+'.xlsx');
+}
+
+function clearHistory(){
+  if(!confirm('Clear all history?'))return;
+  pushFB('history',[]);
+}
+
+function renderAdmin(){
+  PENDING=JSON.parse(JSON.stringify(ST.roasters));
+  var html='';
+  PENDING.forEach(function(r,i){
+    html+='<div class="ag">';
+    html+='<input value="'+r.name.replace(/"/g,'&quot;')+'" placeholder="Name" onchange="PENDING['+i+'].name=this.value">';
+    html+='<input value="'+r.country+'" style="text-transform:uppercase" onchange="PENDING['+i+'].country=this.value.toUpperCase().trim()">';
+    html+='<input type="number" value="'+(r.annual||0)+'" min="0" onchange="PENDING['+i+'].annual=+this.value">';
+    html+='<input type="number" value="'+r.arabica+'" min="0" max="100" onchange="PENDING['+i+'].arabica=Math.min(100,Math.max(0,+this.value))">';
+    html+='<select onchange="PENDING['+i+'].trader=this.value">';
+    TRADERS.forEach(function(t){html+='<option'+(t===r.trader?' selected':'')+'>'+t+'</option>';});
+    html+='</select>';
+    html+='<button class="del-btn" onclick="PENDING.splice('+i+',1);renderAdmin()">×</button>';
+    html+='</div>';
+  });
+  document.getElementById('adminRows').innerHTML=html;
+}
+
+function addRoasterRow(){
+  if(!PENDING)PENDING=JSON.parse(JSON.stringify(ST.roasters));
+  PENDING.push({id:'r'+Date.now(),name:'',country:'',trader:'Alberto',annual:0,arabica:50});
+  renderAdmin();
+}
+
+function saveRoasters(){
+  if(!PENDING)return;
+  var clean=PENDING.filter(function(r){return r.name.trim();});
+  pushFB('roasters',clean);
+  alert('Saved '+clean.length+' roasters — all users updated.');
+}
+
+// ── FIREBASE ──────────────────────────────────────────────────
+var db;
+var firebaseConfig = {
+  apiKey:            "AIzaSyAWaU8iQkR6Q6avugQamC-1IIZLsSpYV7A",
+  authDomain:        "sucden-coffee-coverage.firebaseapp.com",
+  databaseURL:       "https://sucden-coffee-coverage-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "sucden-coffee-coverage",
+  storageBucket:     "sucden-coffee-coverage.firebasestorage.app",
+  messagingSenderId: "237675379815",
+  appId:             "1:237675379815:web:445e380ce6b9f0ad55a8c2"
+};
+
+function pushFB(path, value){
+  if(!db)return;
+  setSaving();
+  var u={};
+  u['coverage/'+path]=value;
+  db.ref().update(u).catch(function(e){document.getElementById('liveLabel').textContent='Save failed';});
+}
+
+function seedDB(){
+  var seedFirebase={};
+  Object.keys(SEED).forEach(function(k){seedFirebase[k.replace(/\|/g,'__')]=SEED[k];});
+  db.ref('coverage').set({windowStart:'2026-01',data:seedFirebase,roasters:DEFAULT_ROASTERS,history:[]});
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+// Populate trader dropdown
+TRADERS.forEach(function(t){
+  var o=document.createElement('option');
+  o.value=t; o.textContent=t;
+  document.getElementById('traderFilter').appendChild(o);
+});
+
+function quickFill(rid) {
+  var numMonths = parseInt(QF_MONTHS[rid] || '0');
+  if (!numMonths) { alert('Please select how many months to fill first.'); return; }
+  var fillVal = '10';
+  var ws = getWS();
+  var months = getMonths(ws);
+  // Fill selected months with value, clear the rest
+  for (var i = 0; i < months.length; i++) {
+    var mk = monthKey(months[i]);
+    var v = i < numMonths ? fillVal : '';
+    ST.data[rid+'|'+mk] = v;
+    var inp = document.querySelector('[data-rid="'+rid+'"][data-mk="'+mk+'"]');
+    if (inp) { inp.setAttribute('value', v); inp.value = v; inp.style.background = covBg(v); }
+    pushFB('data/'+rid+'__'+mk, v || null);
+  }
+  // Reset dropdown to 0 so trader must re-choose next time
+  QF_MONTHS[rid] = '0';
+  // Single render at end
+  doRender();
+}
+
+function reseedData() {
+  if (!confirm('Restore all original FY2026 coverage data? Current changes will be lost.')) return;
+  seedDB();
+  alert('Data restored! Refreshing...');
+  setTimeout(function(){ location.reload(); }, 1500);
+}
+
+// Render immediately with default data
+doRender();
+
+// Connect Firebase
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+
+  db.ref('.info/connected').on('value', function(s){ setLive(!!s.val()); });
+
+  db.ref('coverage').on('value', function(snap){
+    try {
+      var r=snap.val();
+      if(!r){ seedDB(); return; }
+      if(r.windowStart) ST.windowStart=r.windowStart;
+      if(r.data){
+        ST.data={};
+        Object.keys(r.data).forEach(function(k){
+          if(r.data[k]!==null&&r.data[k]!==undefined) ST.data[k.replace(/__/g,'|')]=String(r.data[k]);
+        });
+      }
+      if(r.roasters){
+        var raw=r.roasters;
+        ST.roasters=Array.isArray(raw)?raw:Object.values(raw).filter(function(x){return x&&x.id;});
+        if(!ST.roasters.length) ST.roasters=DEFAULT_ROASTERS;
+      }
+      if(r.history){
+        var rawH=r.history;
+        ST.history=Array.isArray(rawH)?rawH:Object.values(rawH).filter(Boolean);
+      }
+    } catch(e){ console.error('Firebase parse error:',e); }
+    doRender();
+  });
+} catch(e){
+  console.error('Firebase init error:',e);
+  setLive(false);
+}
+
+function quickFill(rid) {
+  var numMonths = parseInt(QF_MONTHS[rid] || '0');
+  if (!numMonths) { alert('Please select how many months to fill first.'); return; }
+  var fillVal = '10';
+  var ws = getWS();
+  var months = getMonths(ws);
+  // Fill selected months with value, clear the rest
+  for (var i = 0; i < months.length; i++) {
+    var mk = monthKey(months[i]);
+    var v = i < numMonths ? fillVal : '';
+    ST.data[rid+'|'+mk] = v;
+    var inp = document.querySelector('[data-rid="'+rid+'"][data-mk="'+mk+'"]');
+    if (inp) { inp.setAttribute('value', v); inp.value = v; inp.style.background = covBg(v); }
+    pushFB('data/'+rid+'__'+mk, v || null);
+  }
+  // Reset dropdown to 0 so trader must re-choose next time
+  QF_MONTHS[rid] = '0';
+  // Single render at end
+  doRender();
+}
+
+function reseedData() {
+  if (!confirm('Restore all original FY2026 coverage data? Current changes will be lost.')) return;
+  seedDB();
+  alert('Data restored! Refreshing...');
+  setTimeout(function(){ location.reload(); }, 1500);
+}
+
+// Render immediately with default data
+doRender();
+</script>
+</body>
+</html>
