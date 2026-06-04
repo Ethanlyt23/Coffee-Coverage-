@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nedcoffee — Admin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f8fa;--bg2:#ffffff;--bg3:#eef0f4;--bg4:#e4e7ed;
+  --txt:#1a1f2e;--txt2:#5a6272;--txt3:#9aa0ad;
+  --green:#1d9e75;--gbg:rgba(29,158,117,0.1);--gtxt:#0c6e52;
+  --amber:#ba7517;--abg:rgba(186,117,23,0.1);--atxt:#7a4d0e;
+  --red:#c0392b;--rbg:rgba(192,57,43,0.1);--rtxt:#8b2820;
+  --blue:#185fa5;--border:#dde1e9;--border2:#c8cdd8;
+  --rad:8px;--rad-lg:12px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--txt);font-size:13px;min-height:100vh}
+.header{background:var(--txt);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100}
+.logo{font-size:15px;font-weight:600;color:#fff}.logo span{color:var(--green);font-weight:400}
+.conn{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.5)}
+.dot{width:7px;height:7px;border-radius:50%;background:#555;transition:all .3s}
+.dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+.hbtns{display:flex;gap:8px}
+.hbtn{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:6px 14px;border-radius:var(--rad);border:1px solid rgba(255,255,255,.2);cursor:pointer;background:rgba(255,255,255,.08);color:#fff;font-family:inherit;white-space:nowrap}
+.hbtn:hover{background:rgba(255,255,255,.18)}.hbtn.primary{background:var(--green);border-color:var(--green)}.hbtn.primary:hover{background:var(--gtxt)}
+.subheader{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:52px;z-index:99}
+.month-tabs{display:flex;gap:0;background:var(--bg3);border-radius:var(--rad);overflow:hidden;border:1px solid var(--border)}
+.month-tab{padding:7px 12px;font-size:11px;font-weight:500;color:var(--txt2);cursor:pointer;border:none;background:none;font-family:inherit;white-space:nowrap;transition:all .15s;position:relative}
+.month-tab:hover{color:var(--txt);background:var(--bg4)}.month-tab.active{background:var(--txt);color:#fff;font-weight:600}
+.month-tab.has-data::after{content:'';position:absolute;top:4px;right:3px;width:4px;height:4px;border-radius:50%;background:var(--green)}
+.month-tab.active.has-data::after{background:var(--green)}
+select.flt{font-size:12px;padding:6px 10px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg2);color:var(--txt);font-family:inherit}
+input.flt{font-size:12px;padding:6px 10px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg2);color:var(--txt);font-family:inherit;width:180px}
+.page-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 20px;position:sticky;top:102px;z-index:98}
+.page-tab{padding:11px 16px;font-size:12px;font-weight:500;color:var(--txt2);cursor:pointer;border:none;background:none;font-family:inherit;border-bottom:2px solid transparent;transition:all .15s}
+.page-tab:hover{color:var(--txt)}.page-tab.active{color:var(--green);border-bottom-color:var(--green);font-weight:600}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:16px 20px;max-width:1400px;margin:0 auto}
+.mc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rad-lg);padding:13px 15px}
+.mc-label{font-size:11px;color:var(--txt2);margin-bottom:3px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.mc-value{font-size:20px;font-weight:600;color:var(--txt);line-height:1}.mc-sub{font-size:11px;color:var(--txt3);margin-top:2px}
+.mc.hi{border-color:var(--green);background:var(--gbg)}.mc.hi .mc-value{color:var(--gtxt)}
+.page{padding:0 20px 20px;max-width:1400px;margin:0 auto}
+.banner{background:var(--green);color:#fff;padding:10px 16px;font-size:13px;font-weight:500;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;border-radius:var(--rad-lg)}
+.banner span{opacity:.85;font-size:12px}
+.tw{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rad-lg);overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--bg3);padding:9px 12px;text-align:left;font-weight:600;font-size:11px;color:var(--txt2);border-bottom:1px solid var(--border2);white-space:nowrap}
+th.tc{text-align:center}
+td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.trader-hdr td{background:#f0f2f6;font-size:11px;font-weight:700;color:var(--txt2);padding:6px 14px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--border2)}
+tr.spacer td{height:4px;background:var(--bg);border-bottom:1px solid var(--border2)}
+tr:hover td{background:var(--bg3)}
+tr.trader-hdr:hover td,tr.spacer:hover td{background:inherit}
+.rname{font-size:12px;font-weight:500}.rcountry{font-size:10px;color:var(--txt3)}
+.annual{font-size:11px;font-weight:600;color:var(--txt2)}
+.blend-pill{display:inline-flex;font-size:10px;border-radius:6px;overflow:hidden;border:1px solid var(--border)}
+.ba{background:#e3f7ef;color:#0c6e52;padding:2px 6px;font-weight:600}
+.br{background:#f5ede3;color:#6b3d1a;padding:2px 6px;font-weight:600}
+.b100a{background:#e3f7ef;color:#0c6e52;padding:2px 8px;font-weight:600;border-radius:6px;border:1px solid var(--border);font-size:10px;display:inline-block}
+.b100r{background:#f5ede3;color:#6b3d1a;padding:2px 8px;font-weight:600;border-radius:6px;border:1px solid var(--border);font-size:10px;display:inline-block}
+
+/* COMBINED COV DISPLAY */
+.cov-combined{font-size:13px;font-weight:700;text-align:center;white-space:nowrap}
+.cov-ara{color:var(--gtxt)}.cov-rob{color:var(--atxt)}.cov-blank{color:var(--txt3)}
+.cov-sep{color:var(--txt3);font-weight:400;margin:0 2px}
+
+.status-badge{display:inline-flex;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px}
+.status-badge.full{background:var(--gbg);color:var(--gtxt);border:1px solid var(--green)}
+.status-badge.part{background:var(--abg);color:var(--atxt);border:1px solid var(--amber)}
+.status-badge.none{background:var(--rbg);color:var(--rtxt);border:1px solid var(--red)}
+
+/* GLOBAL DEMAND */
+.gd-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rad-lg);padding:20px;margin-bottom:16px}
+.gd-panel h3{font-size:14px;font-weight:600;margin-bottom:4px}
+.gd-panel p{font-size:12px;color:var(--txt2);margin-bottom:16px}
+.gd-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px}
+.gd-field{display:flex;flex-direction:column;gap:4px}
+.gd-field label{font-size:11px;font-weight:600;color:var(--txt2);text-transform:uppercase;letter-spacing:.04em}
+.gd-field input{font-size:13px;padding:8px 10px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg);color:var(--txt);font-family:inherit}
+.gd-field input:focus{outline:none;border-color:var(--blue)}
+.btn{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:7px 14px;border-radius:var(--rad);border:1px solid var(--border);cursor:pointer;background:var(--bg2);color:var(--txt);font-family:inherit}
+.btn:hover{background:var(--bg3)}.btn.primary{background:var(--green);border-color:var(--green);color:#fff}.btn.primary:hover{background:var(--gtxt)}
+.gd-saved{display:none;color:var(--gtxt);font-size:12px;margin-left:10px;font-weight:500}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="logo">Nedcoffee <span>Admin</span></div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="conn"><div class="dot" id="dot"></div><span id="connLabel">Connecting...</span></div>
+    <div class="hbtns"><button class="hbtn primary" onclick="exportExcel()">↓ Excel</button></div>
+  </div>
+</header>
+<div class="subheader">
+  <div class="month-tabs" id="monthTabs"></div>
+  <select class="flt" id="traderFilter"><option value="">All traders</option></select>
+  <input class="flt" id="searchBox" placeholder="Search roaster...">
+</div>
+<div class="page-tabs">
+  <button class="page-tab active" id="tabOverview" onclick="showTab('overview')">📊 Overview</button>
+  <button class="page-tab" id="tabSettings" onclick="showTab('settings')">⚙ Global Demand</button>
+</div>
+
+<div id="panelOverview">
+  <div class="metrics" id="metrics"></div>
+  <div class="page">
+    <div class="banner"><strong id="bannerMonth">Loading...</strong><span id="bannerSub"></span></div>
+    <div class="tw"><table><thead id="tHead"></thead><tbody id="tBody"></tbody></table></div>
+  </div>
+</div>
+
+<div id="panelSettings" style="display:none">
+  <div class="page" style="padding-top:16px">
+    <div class="gd-panel">
+      <h3>Global Demand Figures</h3>
+      <p>Update monthly from the balance sheet. Used to calculate coverage percentages in the overview.</p>
+      <div class="gd-grid">
+        <div class="gd-field"><label>Total global demand (bags/year)</label><input type="number" id="gdTotal" placeholder="e.g. 115100000"></div>
+        <div class="gd-field"><label>Global Robusta demand</label><input type="number" id="gdRobusta" placeholder="e.g. 42600000"></div>
+        <div class="gd-field"><label>Global Arabica demand</label><input type="number" id="gdArabica" placeholder="e.g. 72500000"></div>
+      </div>
+      <div style="display:flex;align-items:center">
+        <button class="btn primary" onclick="saveGlobalDemand()">✓ Save global demand</button>
+        <span class="gd-saved" id="gdSaved">✓ Saved!</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var firebaseConfig={apiKey:"AIzaSyAWaU8iQkR6Q6avugQamC-1IIZLsSpYV7A",authDomain:"sucden-coffee-coverage.firebaseapp.com",databaseURL:"https://sucden-coffee-coverage-default-rtdb.europe-west1.firebasedatabase.app",projectId:"sucden-coffee-coverage",storageBucket:"sucden-coffee-coverage.firebasestorage.app",messagingSenderId:"237675379815",appId:"1:237675379815:web:445e380ce6b9f0ad55a8c2"};
+var TRADERS=['Alberto','Andre','Chris','CoffeeAM','Daniel','Dennis','Harish','Lucas','Michel','Richard','Wayne'];
+var MONTHS=['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'];
+var MLABELS=['Jan 2026','Feb 2026','Mar 2026','Apr 2026','May 2026','Jun 2026','Jul 2026','Aug 2026','Sep 2026','Oct 2026','Nov 2026','Dec 2026'];
+var MSHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var db,ST={roasters:[],data:{},globalDemand:{total:115100000,robusta:42600000,arabica:72500000}};
+var currentMonth='2026-06';
+
+firebase.initializeApp(firebaseConfig);
+db=firebase.database();
+
+db.ref('.info/connected').on('value',function(s){
+  var on=!!s.val();
+  document.getElementById('dot').className='dot'+(on?' on':'');
+  document.getElementById('connLabel').textContent=on?'Live':'Offline';
+});
+
+db.ref('coverage').on('value',function(snap){
+  var r=snap.val()||{};
+  if(r.roasters){var raw=r.roasters;ST.roasters=Array.isArray(raw)?raw:Object.values(raw).filter(function(x){return x&&x.id;});}
+  ST.data={};
+  if(r.data){Object.keys(r.data).forEach(function(k){if(r.data[k]!==null&&r.data[k]!==undefined)ST.data[k]=r.data[k];});}
+  if(r.globalDemand)ST.globalDemand=r.globalDemand;
+  syncGDFields();buildMonthTabs();buildMetrics();doRender();
+});
+
+TRADERS.forEach(function(t){
+  var o=document.createElement('option');o.value=t;o.textContent=t;
+  document.getElementById('traderFilter').appendChild(o);
+});
+document.getElementById('traderFilter').addEventListener('change',doRender);
+document.getElementById('searchBox').addEventListener('input',doRender);
+
+function showTab(tab){
+  document.getElementById('panelOverview').style.display=tab==='overview'?'block':'none';
+  document.getElementById('panelSettings').style.display=tab==='settings'?'block':'none';
+  document.getElementById('tabOverview').className='page-tab'+(tab==='overview'?' active':'');
+  document.getElementById('tabSettings').className='page-tab'+(tab==='settings'?' active':'');
+}
+function syncGDFields(){
+  var gd=ST.globalDemand||{};
+  if(gd.total)document.getElementById('gdTotal').value=gd.total;
+  if(gd.robusta)document.getElementById('gdRobusta').value=gd.robusta;
+  if(gd.arabica)document.getElementById('gdArabica').value=gd.arabica;
+}
+function saveGlobalDemand(){
+  var gd={total:parseFloat(document.getElementById('gdTotal').value)||0,robusta:parseFloat(document.getElementById('gdRobusta').value)||0,arabica:parseFloat(document.getElementById('gdArabica').value)||0};
+  ST.globalDemand=gd;
+  db.ref('coverage/globalDemand').set(gd).then(function(){
+    var s=document.getElementById('gdSaved');s.style.display='inline';
+    setTimeout(function(){s.style.display='none';},3000);buildMetrics();
+  }).catch(function(){alert('Save failed.');});
+}
+function buildMonthTabs(){
+  var nav=document.getElementById('monthTabs');nav.innerHTML='';
+  MONTHS.forEach(function(m,i){
+    var hasData=Object.keys(ST.data).some(function(k){return k.indexOf('__'+m)!==-1;});
+    var btn=document.createElement('button');
+    btn.className='month-tab'+(m===currentMonth?' active':'')+(hasData?' has-data':'');
+    btn.textContent=MSHORT[i];btn.dataset.month=m;
+    btn.addEventListener('click',function(){currentMonth=this.dataset.month;buildMonthTabs();buildMetrics();doRender();});
+    nav.appendChild(btn);
+  });
+}
+function getVal(rid,month,type){
+  var newKey=rid+'__'+month+'__'+type;
+  if(ST.data[newKey]!==undefined&&ST.data[newKey]!==null)return parseFloat(ST.data[newKey]);
+  return null;
+}
+function fmtM(n){if(!n||n===0)return'—';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1000)return Math.round(n/1000)+'k';return String(n);}
+function fmtK(n){if(!n||n===0)return'—';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return Math.round(n/1000)+'k';return String(n);}
+function barColor(v){if(v===null)return'#e4e7ed';if(v>=6)return'#1d9e75';if(v>=4)return'#ba7517';return'#c0392b';}
+
+function buildMetrics(){
+  var araVals=[];var robVals=[];
+  ST.roasters.forEach(function(r){
+    var arabica=r.arabica||0;
+    if(arabica>0){var v=getVal(r.id,currentMonth,'ara');if(v!==null)araVals.push(v);}
+    if(arabica<100){var v=getVal(r.id,currentMonth,'rob');if(v!==null)robVals.push(v);}
+  });
+  var avgAra=araVals.length?(araVals.reduce(function(a,b){return a+b;},0)/araVals.length).toFixed(1):'—';
+  var avgRob=robVals.length?(robVals.reduce(function(a,b){return a+b;},0)/robVals.length).toFixed(1):'—';
+  var filled=ST.roasters.filter(function(r){
+    var arabica=r.arabica||0;
+    if(arabica>0&&getVal(r.id,currentMonth,'ara')!==null)return true;
+    if(arabica<100&&getVal(r.id,currentMonth,'rob')!==null)return true;
+    return false;
+  }).length;
+  var totalAll=0,totalRob=0,totalAra=0;
+  ST.roasters.forEach(function(r){var a=Math.round((r.annual||0)*(r.arabica||0)/100);totalAll+=r.annual||0;totalAra+=a;totalRob+=(r.annual||0)-a;});
+  var gd=ST.globalDemand||{};
+  document.getElementById('metrics').innerHTML=
+    '<div class="mc hi"><div class="mc-label">Avg Arabica Coverage</div><div class="mc-value" style="color:var(--gtxt)">'+(avgAra==='—'?'—':avgAra+'/12')+'</div><div class="mc-sub">'+araVals.length+' roasters filled</div></div>'+
+    '<div class="mc" style="border-color:var(--amber);background:var(--abg)"><div class="mc-label">Avg Robusta Coverage</div><div class="mc-value" style="color:var(--atxt)">'+(avgRob==='—'?'—':avgRob+'/12')+'</div><div class="mc-sub">'+robVals.length+' roasters filled</div></div>'+
+    '<div class="mc"><div class="mc-label">Total Demand</div><div class="mc-value">'+fmtM(totalAll)+'</div><div class="mc-sub">'+(gd.total?Math.round(totalAll/gd.total*100)+'% of '+fmtM(gd.total)+' global':'—')+'</div></div>'+
+    '<div class="mc"><div class="mc-label">Robusta</div><div class="mc-value">'+fmtM(totalRob)+'</div><div class="mc-sub">'+(gd.robusta?Math.round(totalRob/gd.robusta*100)+'% of global':'—')+'</div></div>'+
+    '<div class="mc"><div class="mc-label">Arabica</div><div class="mc-value">'+fmtM(totalAra)+'</div><div class="mc-sub">'+(gd.arabica?Math.round(totalAra/gd.arabica*100)+'% of global':'—')+'</div></div>'+
+    '<div class="mc"><div class="mc-label">Month</div><div class="mc-value" style="font-size:15px">'+MLABELS[MONTHS.indexOf(currentMonth)]+'</div><div class="mc-sub">'+filled+' of '+ST.roasters.length+' roasters with data</div></div>';
+  var idx=MONTHS.indexOf(currentMonth);
+  document.getElementById('bannerMonth').textContent=MLABELS[idx]+' Coverage';
+  document.getElementById('bannerSub').textContent=filled+' of '+ST.roasters.length+' roasters filled in';
+}
+
+function doRender(){
+  var tf=document.getElementById('traderFilter').value;
+  var search=document.getElementById('searchBox').value.toLowerCase();
+  var roasters=ST.roasters.filter(function(r){
+    if(tf&&r.trader!==tf)return false;
+    if(search&&r.name.toLowerCase().indexOf(search)===-1&&(r.trader||'').toLowerCase().indexOf(search)===-1)return false;
+    return true;
+  });
+  document.getElementById('tHead').innerHTML='<tr>'+
+    '<th>Roaster</th><th>Ctry</th><th>Trader</th><th>Annual bags</th><th>Blend</th>'+
+    '<th class="tc" style="width:120px">Coverage (Ara/Rob)</th>'+
+    '<th class="tc">Status</th></tr>';
+  var byT={};roasters.forEach(function(r){if(!byT[r.trader])byT[r.trader]=[];byT[r.trader].push(r);});
+  var order=TRADERS.filter(function(t){return byT[t];});
+  var tbody=document.getElementById('tBody');tbody.innerHTML='';
+  if(!order.length){
+    var et=document.createElement('tr');var ed=document.createElement('td');ed.colSpan=7;
+    ed.style.cssText='text-align:center;padding:2rem;color:var(--txt3)';ed.textContent='No roasters match.';
+    et.appendChild(ed);tbody.appendChild(et);return;
+  }
+  order.forEach(function(trader){
+    var rows=byT[trader];
+    var filled=rows.filter(function(r){
+      var arabica=r.arabica||0;
+      if(arabica>0&&getVal(r.id,currentMonth,'ara')!==null)return true;
+      if(arabica<100&&getVal(r.id,currentMonth,'rob')!==null)return true;
+      return false;
+    }).length;
+    var araVals=rows.filter(function(r){return(r.arabica||0)>0;}).map(function(r){return getVal(r.id,currentMonth,'ara');}).filter(function(v){return v!==null;});
+    var robVals=rows.filter(function(r){return(r.arabica||0)<100;}).map(function(r){return getVal(r.id,currentMonth,'rob');}).filter(function(v){return v!==null;});
+    var avgAra=araVals.length?(araVals.reduce(function(a,b){return a+b;},0)/araVals.length).toFixed(1):'—';
+    var avgRob=robVals.length?(robVals.reduce(function(a,b){return a+b;},0)/robVals.length).toFixed(1):'—';
+    var compClass=filled===rows.length?'full':filled>0?'part':'none';
+    var hdrTr=document.createElement('tr');hdrTr.className='trader-hdr';
+    var hdrTd=document.createElement('td');hdrTd.colSpan=7;
+    hdrTd.innerHTML=trader+' &nbsp;·&nbsp; '+rows.length+' roasters &nbsp;·&nbsp; avg <span style="color:var(--gtxt)">'+avgAra+'A</span> / <span style="color:var(--atxt)">'+avgRob+'R</span> &nbsp;&nbsp;<span class="status-badge '+compClass+'">'+filled+'/'+rows.length+' filled</span>';
+    hdrTr.appendChild(hdrTd);tbody.appendChild(hdrTr);
+    rows.forEach(function(r){
+      var arabica=r.arabica||0;var tp=arabica===100?'ara':arabica===0?'rob':'mix';
+      var ara=getVal(r.id,currentMonth,'ara');
+      var rob=getVal(r.id,currentMonth,'rob');
+      var tr=document.createElement('tr');
+      var nameTd=document.createElement('td');nameTd.innerHTML='<div class="rname">'+r.name+'</div>';tr.appendChild(nameTd);
+      var cTd=document.createElement('td');cTd.innerHTML='<span class="rcountry">'+r.country+'</span>';tr.appendChild(cTd);
+      var tTd=document.createElement('td');tTd.style.cssText='font-size:11px;color:var(--txt2)';tTd.textContent=r.trader;tr.appendChild(tTd);
+      var aTd=document.createElement('td');aTd.innerHTML='<span class="annual">'+fmtK(r.annual||0)+'</span>';tr.appendChild(aTd);
+      var bTd=document.createElement('td');
+      if(tp==='ara')bTd.innerHTML='<span class="b100a">100% Ara</span>';
+      else if(tp==='rob')bTd.innerHTML='<span class="b100r">100% Rob</span>';
+      else bTd.innerHTML='<span class="blend-pill"><span class="ba">'+arabica+'%A</span><span class="br">'+(100-arabica)+'%R</span></span>';
+      tr.appendChild(bTd);
+
+      // Combined cov display
+      var vTd=document.createElement('td');vTd.style.textAlign='center';
+      var parts=[];
+      if(tp!=='rob'){parts.push('<span class="cov-ara">'+(ara!==null?ara+'A':'<span class="cov-blank">—A</span>')+'</span>');}
+      if(tp==='mix'){parts.push('<span class="cov-sep">/</span>');}
+      if(tp!=='ara'){parts.push('<span class="cov-rob">'+(rob!==null?rob+'R':'<span class="cov-blank">—R</span>')+'</span>');}
+      vTd.innerHTML='<div class="cov-combined">'+parts.join('')+'</div>';
+      tr.appendChild(vTd);
+
+      var sTd=document.createElement('td');sTd.style.textAlign='center';
+      var isFilled=(tp!=='rob'&&ara!==null)||(tp!=='ara'&&rob!==null);
+      var bothFilled=(tp==='ara'&&ara!==null)||(tp==='rob'&&rob!==null)||(tp==='mix'&&ara!==null&&rob!==null);
+      var anyLow=(ara!==null&&ara<4)||(rob!==null&&rob<4);
+      if(!isFilled)sTd.innerHTML='<span class="status-badge none">Not filled</span>';
+      else if(bothFilled&&!anyLow)sTd.innerHTML='<span class="status-badge full">✓ Complete</span>';
+      else if(anyLow)sTd.innerHTML='<span class="status-badge none">Low</span>';
+      else sTd.innerHTML='<span class="status-badge part">Partial</span>';
+      tr.appendChild(sTd);tbody.appendChild(tr);
+    });
+    var sp=document.createElement('tr');sp.className='spacer';var sd=document.createElement('td');sd.colSpan=7;sp.appendChild(sd);tbody.appendChild(sp);
+  });
+  buildMetrics();
+}
+
+function exportExcel(){
+  var wb=XLSX.utils.book_new();
+  MONTHS.forEach(function(m,mi){
+    var rows=[[MLABELS[mi]+' Coverage'],[],['Roaster','Country','Trader','Annual Bags','Arabica Bags','Robusta Bags','Arabica Coverage (0-12)','Robusta Coverage (0-12)','Status']];
+    ST.roasters.forEach(function(r){
+      var arabica=r.arabica||0;
+      var ara2=Math.round((r.annual||0)*arabica/100),rob2=(r.annual||0)-ara2;
+      var ara=getVal(r.id,m,'ara');var rob=getVal(r.id,m,'rob');
+      var tp=arabica===100?'ara':arabica===0?'rob':'mix';
+      var isFilled=(tp!=='rob'&&ara!==null)||(tp!=='ara'&&rob!==null);
+      var bothFilled=(tp==='ara'&&ara!==null)||(tp==='rob'&&rob!==null)||(tp==='mix'&&ara!==null&&rob!==null);
+      var status=!isFilled?'Not filled':bothFilled?'Complete':'Partial';
+      rows.push([r.name,r.country,r.trader,r.annual||0,ara2,rob2,ara!==null?ara:'',rob!==null?rob:'',status]);
+    });
+    var s=XLSX.utils.aoa_to_sheet(rows);
+    s['!cols']=[{wch:28},{wch:8},{wch:12},{wch:13},{wch:13},{wch:13},{wch:15},{wch:15},{wch:10}];
+    XLSX.utils.book_append_sheet(wb,s,MSHORT[mi]+' 26');
+  });
+  XLSX.writeFile(wb,'Nedcoffee_Coverage_2026.xlsx');
+}
+</script>
+</body>
+</html>
